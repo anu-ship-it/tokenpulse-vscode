@@ -1,26 +1,40 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
+// -- Pricing per 1M input tokens (USD) -----
+const COST_PER_M: Record<string, number> = {
+	"copilot-gpt-4o":			2.50,
+	"copilot-gpt-4o-mini":		0.15,
+	"copilot-claude-sonnet-4":	3.00,
+	"copilot-calude-opus-4":    15.00,
+	"copilot-o1":				15.00,
+	"copilot-o3-mini":			 1.10,
+	"default":					 2.50,
+};
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "tokenpulse" is now active!');
-
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('tokenpulse.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from Tokenpulse!');
-	});
-
-	context.subscriptions.push(disposable);
+// -- Session state ----
+interface RequestRecord {
+	ts:			number;
+	model:		string;
+	tokens:		number;
+	cost:		number;
 }
 
-// This method is called when your extension is deactivated
-export function deactivate() {}
+let sessionRequests: RequestRecord[] = [];
+let todayRequests: RequestRecord[] = [];
+let statusBar:	   vscode.StatusBarItem;
+let panel:		   vscode.WebviewPanel | undefined;
+
+// -- Helpers --
+function estimateCost(tokens: number, model: string): number {
+	const price = COST_PER_M[model] ?? COST_PER_M["default"];
+	return (tokens / 1_00_000) * price;
+}
+
+function fmtCost(usd: number): string {
+	if (usd <= 0)		return "$0.00";
+	if (usd < 0.001)	return "<$0.001";
+	if (usd < 0.01)		return "$" + usd.toFixed(4);
+	if (usd < 1)		return "$" + usd.toFixed(3);
+	return "$" + usd.toFixed(2);
+}
+
