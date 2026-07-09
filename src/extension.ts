@@ -198,5 +198,77 @@ function getWebviewContent(data: ReturnType<typeof getDashboardData>): string {
 		   }
 			.model-name { font-size: 13px; font-weight: 600; }
 			.model-stats { display: flex; gap: 16px; align-items: center; }
-			    `
+			.model-tokens { font-size: 12px; color: var(--vscode-textLink-foreground); }
+			
+			.empty-row {
+			  padding: 16px; text-align: center;
+			  color: var(--vscode-descriptionForeground); font-size: 12px;
+			}
+			  
+			.reset-btn {
+			  margin-top: 20px; padding: 8px 16px;
+			  background: var(--vscode-button-background);
+			  color: var(--vscode-button-foreground);
+			  border: none; border-radius: 4px; cursor: pointer;
+			  font-size: 12px; font-family: inherit;
+			}
+			  
+			.reset-btn:hover { background: var(--vscode-button-hoverBackground); }
+			
+			.disclaimer {
+			  margin-top: 16px; font-size: 10px;
+			  color: var(--vscode-descriptionForeground); opacity: .6;
+			}
+		</style>
+	  </head>
+	  <body>
+	    <div class="header">
+		  <div>
+		    <div class="header-title">TokenPulse</div>
+			<div class="header-sub">${requestCount} AI request${requestCount !== 1 ? "s" : ""} this session</div>
+		   </div>
+		  </div>
+		  
+		 <div class="grid">
+		   <div class="card">
+		     <div class="card-label">This Session</div>
+			 <div class="crd-sub">${fk(session.tokens)} tokens</div>
+			</div>
+			<div class="card-label">
+			  <div class="card-label">Today</div>
+			  <div class="card-value">${fmtCost(today.cost)}</div>
+			  <div class="card-sub">${fk(today.tokens)} tokens</div>
+			</div>
+			<div class="card">
+			  <div class="card-label">This Week</div>
+			  <div class="card-value">${fmtCost(week.cost)}</div>
+			  <div class="card-sub">${fk(week.tokens)} tokens</div>
+			</div>
+		  </div>
+		  
+		  <div class="section-title">By Model - This Session</div>
+		  ${modelRows}
+		  
+		 <button class="reset-btn" onclick="resetSession()">Reset Session</button>
+		 
+		 <div class="disclaimer">±8% accuracy . input tokens only . output not included</div>
+		 
+		<script>
+		  const vscode = acquireVsCodeApi();
+		  
+		 function resetSession() {
+		   vscode.postMessage({ type: "RESET_SESSION" });
+		 }
+		   
+		 window.addEventListener("message", e => {
+		   if (e.data.type === "UPDATE") {
+		 	// Reload the webview with fresh data
+			location.reload();  
+		   } 
+		 });
+	</script>
+ </body>
+ </html>`;
 }
+
+// -- LM API Listener --
