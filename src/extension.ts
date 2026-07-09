@@ -38,3 +38,31 @@ function fmtCost(usd: number): string {
 	return "$" + usd.toFixed(2);
 }
 
+function fk(n: number): string {
+	if (n >= 1000) return (n / 1000).toFixed(1) + "k";
+	return String(Math.round(n));
+}
+
+function isSameDay(ts: number): boolean {
+	const d = new Date(ts);
+	const now = new Date();
+	return d.getDate() === now.getDate() &&
+		   d.getMonth() === now.getMonth() &&
+		   d.getFullYear() === now.getFullYear();
+}
+
+function todayToday(): { tokens: number; cost: number } {
+	const recs = todayRequests.filter(r => isSameDay(r.ts));
+	return {
+		tokens: recs.reduce((s, r) => s + r.tokens, 0),
+		cost: recs.reduce((s, r) => s + r.cost, 0), 
+	};
+}
+
+function sessionTotal(): { tokens: number; cost: number } {
+	return {
+		tokens: sessionRequests.reduce((s, r) => s + r.tokens, 0),
+		cost: sessionRequests.reduce((s, r) => s + r.cost, 0),
+	};
+}
+
