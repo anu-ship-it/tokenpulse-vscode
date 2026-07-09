@@ -1,52 +1,49 @@
 {
   "name": "tokenpulse",
-  "displayName": "Tokenpulse",
-  "description": "Token & cost tracker for VS Code",
-  "version": "0.0.1",
+  "displayName": "TokenPulse",
+  "description": "Live token & cost tracker for GitHub Copilot and VS Code AI features",
+  "version": "0.1.0",
+  "publisher": "alpha-studio",
+  "icon": "media/icon.png",
   "engines": {
     "vscode": "^1.125.0"
   },
-  "categories": [
-    "Other"
-  ],
-  "activationEvents": [],
+  "categories": ["Other", "Machine Learning"],
+  "keywords": ["token", "copilot", "ai", "cost", "tracker"],
+  "activationEvents": ["onStartupFinished"],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "tokenpulse.helloWorld",
-        "title": "Hello World"
+        "command": "tokenpulse.showDashboard",
+        "title": "TokenPulse: Show Dashboard"
+      },
+      {
+        "command": "tokenpulse.resetSession",
+        "title": "TokenPulse: Reset Session"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "TokenPulse",
+      "properties": {
+        "tokenpulse.warnAtPercent": {
+          "type": "number",
+          "default": 75,
+          "description": "Show warning when token usage reaches this percentage"
+        },
+        "tokenpulse.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show token usage in the status bar"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
     "compile": "npm run check-types && npm run lint && node esbuild.js",
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",
-    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
-    "package": "npm run check-types && npm run lint && node esbuild.js --production",
-    "compile-tests": "tsc -p . --outDir out",
-    "watch-tests": "tsc -p . -w --outDir out",
-    "pretest": "npm run compile-tests && npm run compile && npm run lint",
-    "check-types": "tsc --noEmit",
-    "lint": "eslint src",
-    "test": "vscode-test"
-  },
-  "devDependencies": {
-    "@types/vscode": "^1.125.0",
-    "@types/mocha": "^10.0.10",
-    "@types/node": "24.x",
-    "typescript-eslint": "^8.61.1",
-    "eslint": "^10.5.0",
-    "esbuild": "^0.28.1",
-    "npm-run-all": "^4.1.5",
-    "typescript": "^6.0.3",
-    "@vscode/test-cli": "^0.0.15",
-    "@vscode/test-electron": "^3.0.0"
-  },
-  "overrides": {
-    "diff": "^8.0.4",
-    "serialize-javascript": "^7.0.6"
+    "watch:tsc":  
   }
 }
