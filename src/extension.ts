@@ -272,3 +272,31 @@ function getWebviewContent(data: ReturnType<typeof getDashboardData>): string {
 }
 
 // -- LM API Listener --
+function registerLmListener(context: vscode.ExtensionContext): void {
+	// Listen to all LM requests made through vscode.lm
+	if(!vscode.lm) {
+		vscode.window.showWarningMessage("TokenPulse: VS Code LM API not available. Update VS Code to 1.90+.");
+		return;
+	}
+
+	// Hook into lm.sendRequest by wrapping it
+	const originalSendRequest = vscode.lm.sendRequest.bind(vscode.lm);
+
+	(vscode.lm as any).sendRequest = async function(
+		model: vscode.LanguageModelChat,
+		messages: vscode.LanguageModelChatMessage[],
+		options?: vscode.LanguageModelChatRequestOptions,
+		token?: vscode.CancellationToken
+	) {
+		const response = await originalSendRequest(model, messages, options, token);
+
+		// Estimate tokens from messages
+		const inputText = messages.map(m => {
+			if (typeof m.content === "string") return m.content;
+			if (Array.isArray(m.content)) {
+				return m.content.map((c: any) => c.value || "").join(" ");
+			}
+			return "";
+		})
+	}
+}
