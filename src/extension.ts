@@ -297,6 +297,113 @@ function registerLmListener(context: vscode.ExtensionContext): void {
 				return m.content.map((c: any) => c.value || "").join(" ");
 			}
 			return "";
-		})
-	}
+		}).join(" ");
+
+		const tokenCount = Math.ceil(inputText.length / 4);
+		const modelId	 = model.id || "default";
+		const cost 		 = estimateCost(tokenCount, modelId);
+
+		const record: RequestRecord = {
+			ts:		Date.now(),
+			model:	modelId,
+			tokens:	tokenCount,
+			cost,
+		};
+
+		sessionRequests.push(record);
+		todayRequests.push(record);
+
+		// Persist today's records
+		const stored = context.globalState.get<RequestRecord[]>("todayRequests", []);
+		stored.push(record);
+		context.globalState.update("todayRequests", stored.filter(r => isSameDay(r, ts)));
+
+		updateStatusBar();
+
+		// Check warning threshold
+		const config 	= vscode.workspace.getConfiguration("tokenpulse");
+		const warnAt	= config.get<number>("warnAtPercent", 75);
+		const dayTokens = todayToday().tokens;
+		const dayCost	= todayToday().cost;
+
+		if (dayCost > 1 && (dayCost % 1 < 0.01)) {
+			vscode.window.showWarningMessage(
+				`TokenPulse: You've spent ${fmtCost(dayCost)} today (${fk(dayTokens)}
+				tokens).`
+			);
+		}
+
+		return response;
+	};
+
+	context.subscriptions.push({
+		dispose: () => {
+			(vscode.im as any).sendRequest = originalSendRequest;
+		}
+	});
 }
+
+// --Activate --
+export function activate(context: vscode.ExtensionContext): void {
+	// Load persisted today data
+	const stored = context.globalState.get<RequestRecord[]>("todayRequests", []);
+	todayRequests = stored.filter(r => isSameDay(r.ts));
+
+	// Status bar
+	statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right,
+	100);
+	statusBar.command = "tokenpulse.showDashboard";
+	context.subscriptions.push(statusBar);
+	updateStatusBar();
+
+	// Register LM listener
+	registerLmListener(context);
+
+	// Show dashboard command
+	context.subscriptions.push(
+		vscode.commands.registerCommand("tokenpulse.showDashboard", () => {
+			if (panel) {
+				panel.reveal();
+				panel.webview.html = getWebviewContent(getDashboardData());
+				return;
+			}
+
+			panel = vscode.window.createWebviewPanel(
+				"tokenpulse",
+				"TokenPulse",
+				vscode.ViewColumn.Beside,
+				{ enableScripts: true }
+			);
+
+			panel.webview.html = getWebviewContent(getDashboardData());
+
+			panel.webview.onDidReceiveMessage(msg => {
+				if (msg.type === "RESET_SESSION") {
+					vscode.commands.executeCommand("tokenpulse.resetSession");
+				}
+			});
+
+			panel.onDidDispose(() => { panel = undefined; });
+			context.subscriptions.push(panel);
+		})
+	);
+
+	// Reset session command
+	context.subscriptions.push(
+		vscode.commands.registerCommand("tokenpulse.resetSession", () => {
+			sessionRequests = [];
+			updateStatusBar();
+			if (panel) {
+				panel.webview.html = getWebviewContent(getDashboardData());
+			}
+			vscode.window.showInformationMessage("TokenPulse: Session reset.");
+		})
+	);
+
+	vscode.window.showInformationMessage("TokenPulse is active. Use Copilot Chat to start tracking.");
+	}
+
+	export function deactivate(): void {
+		statusBar?.dispose();
+		panel?.dispose();
+	}
