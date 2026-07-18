@@ -10,7 +10,7 @@
   },
   "categories": ["Other", "Machine Learning"],
   "keywords": ["token", "copilot", "ai", "cost", "tracker"],
-  "activationEvents": ["onStartupFinished"],
+  "activationEvents": ["onStartupFinished", "onUri"],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
@@ -21,6 +21,14 @@
       {
         "command": "tokenpulse.resetSession",
         "title": "TokenPulse: Reset Session"
+      },
+      {
+        "command": "tokenpulse.signIn",
+        "title": "TokenPulse: Sign In with Google"
+      },
+      {
+        "command": "tokenpulse.signOut",
+        "title": "TokenPulse: Sign Out"
       }
     ],
     "configuration": {

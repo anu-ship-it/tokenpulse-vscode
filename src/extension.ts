@@ -1,4 +1,69 @@
+const BACKEND_URL = "https://tokenpulsevscode-backend.onrender.com";
+const AUTH_KEY    = "tokenpulse.authToken";
+const USER_KEY    = "tokenpulse.userEmail";
+
 import * as vscode from "vscode";
+
+// ── SignIn function ────────────────────────────
+async function signIn(context: vscode.ExtensionContext): Promise<string | null> {
+  // Open Google OAuth in browser
+  const authUrl = `${BACKEND_URL}/auth/google?redirect=vscode://tokenpulse/callback`;
+  vscode.env.openExternal(vscode.Uri.parse(authUrl));
+
+  // Wait for user to complete OAuth and return token
+  return new Promise((resolve) => {
+    const handler = vscode.window.registerUriHandler({
+      handleUri(uri: vscode.Uri) {
+        const token = new URLSearchParams(uri.query).get("token");
+        if (token) {
+          context.secrets.store(AUTH_KEY, token);
+          resolve(token);
+        } else {
+          resolve(null);
+        }
+        handler.dispose();
+      }
+    });
+
+    // Timeout after 2 minutes
+    setTimeout(() => { handler.dispose(); resolve(null); }, 120000);
+  });
+}
+
+// ── GetToken ────────────────────────────
+async function getToken(context: vscode.ExtensionContext): Promise<string | null> {
+  return (await context.secrets.get(AUTH_KEY)) ?? null;
+}
+
+// ── ReportUsage ────────────────────────────
+async function reportUsage(
+  context: vscode.ExtensionContext,
+  record: RequestRecord
+): Promise<void> {
+  const token = await getToken(context);
+  if (!token) {
+    return; // not signed in — skip reporting
+  }
+
+  try {
+    await fetch(`${BACKEND_URL}/usage/record`, {
+      method:  "POST",
+      headers: {
+        "Content-Type":  "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        provider:      record.model.includes("gpt") || record.model.includes("o1") || record.model.includes("o3") ? "openai" : "anthropic",
+        model:         record.model,
+        input_tokens:  record.tokens,
+        output_tokens: 0,
+        cost_usd:      record.cost,
+      }),
+    });
+  } catch (_) {
+    // Silent fail — don't break the user's workflow
+  }
+}
 
 // ── Pricing per 1M input tokens (USD) ────────────────────────────
 const COST_PER_M: Record<string, number> = {
@@ -265,6 +330,7 @@ function recordRequest(
   context.globalState.update("todayRequests", stored.filter(r => isSameDay(r.ts)));
 
   updateStatusBar();
+  reportUsage(context, record);
 }
 
 // ── LM event listener ─────────────────────────────────────────────
@@ -368,6 +434,27 @@ export function activate(context: vscode.ExtensionContext): void {
   vscode.window.showInformationMessage(
     "TokenPulse is active. Use Copilot Chat to start tracking."
   );
+
+
+// Sign in command
+context.subscriptions.push(
+  vscode.commands.registerCommand("tokenpulse.signIn", async () => {
+    const token = await signIn(context);
+    if (token) {
+      vscode.window.showInformationMessage("TokenPulse: Signed in successfully. Usage will now sync to your account.");
+    } else {
+      vscode.window.showErrorMessage("TokenPulse: Sign in failed or timed out.");
+    }
+  })
+);
+
+// Sign out command
+context.subscriptions.push(
+  vscode.commands.registerCommand("tokenpulse.signOut", async () => {
+    await context.secrets.delete(AUTH_KEY);
+    vscode.window.showInformationMessage("TokenPulse: Signed out.");
+  })
+);
 }
 
 export function deactivate(): void {
