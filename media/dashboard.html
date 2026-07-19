@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
+    <title>TokenPulse</title>
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --tp-teal: #06b6d4;
+            --tp-teal-dim: rgba(6, 182, 212, 0.15);
+            --tp-teal-glow: rgba(6, 182, 212, 0.08);
+            --tp-yellow: #f59e0b;
+            --tp-red: #ef4444;
+            --tp-green: #22c55e;
+        }
+
+        body {
+            font-family: var(--vscode-font-family);
+            font-size: var(--vscode-font-size);
+            color: var(--vscode-foreground);
+            background: var(--vscode-editor-background);
+            padding: 0;
+            overflow-x: hidden;
+            user-select: none;
+        }
+
+        /* ── Header ─────────────────────────────── */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px 12px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: var(--vscode-editor-background);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-ring {
+            width: 28px;
+            height: 28px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-ring svg {
+            width: 28px;
+            height: 28px;
+        }
+
+        .header-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--tp-teal);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 20px;
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.2);
+            color: var(--tp-green);
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--tp-green);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: .4;
+            }
+        }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--vscode-descriptionForeground);
+            padding: 4px;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: color .15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-btn:hover {
+            color: var(--tp-teal);
+        }
+
+        /* ── Sections ───────────────────────────── */
+        .section {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+        }
+
+        .section-label {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--vscode-descriptionForeground);
+            margin-bottom: 10px;
+            opacity: .7;
+        }
+
+        /* ── Budget ─────────────────────────────── */
+        .budget-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .budget-amount {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--tp-teal);
+        }
+
+        .budget-limit {
+            font-size: 12px;
+            color: var(--vscode-descriptionForeground);
+        }
+
+        .budget-edit-btn {
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            background: var(--tp-teal-dim);
+            color: var(--tp-teal);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            cursor: pointer;
+            font-family: inherit;
+            transition: background .15s;
+        }
+
+        .budget-edit-btn:hover {
+            background: rgba(6, 182, 212, 0.25);
+        }
+
+        .budget-bar-track {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--vscode-input-background);
+            overflow: hidden;
+            margin-bottom: 6px;
+        }
+
+        .budget-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            background: var(--tp-teal);
+            transition: width .6s ease, background .3s;
+        }
+
+        .budget-bar-fill.warn {
+            background: var(--tp-yellow);
+        }
+
+        .budget-bar-fill.danger {
+            background: var(--tp-red);
+        }
+
+        .budget-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: var(--vscode-descriptionForeground);
+        }
+
+        .budget-pace {
+            font-size: 10px;
+            margin-top: 6px;
+        }
+
+        .budget-pace.over {
+            color: var(--tp-red);
+        }
+
+        .budget-pace.under {
+            color: var(--tp-green);
+        }
+
+        /* Budget edit form */
+        .budget-form {
+            display: none;
+            margin-top: 10px;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .budget-form.visible {
+            display: flex;
+        }
+
+        .budget-input {
+            flex: 1;
+            padding: 5px 8px;
+            background: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: inherit;
+            outline: none;
+        }
+
+        .budget-input:focus {
+            border-color: var(--tp-teal);
+        }
+
+        .budget-save {
+            padding: 5px 12px;
+            border-radius: 4px;
+            background: var(--tp-teal);
+            color: #080808;
+            border: none;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 700;
+            font-family: inherit;
+        }
+
+        /* ── Stats grid ─────────────────────────── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+        }
+
+        .stat-card {
+            background: var(--vscode-input-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 8px;
+            padding: 10px 12px;
+            transition: border-color .15s;
+        }
+
+        .stat-card:hover {
+            border-color: rgba(6, 182, 212, 0.3);
+        }
+
+        .stat-label {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--vscode-descriptionForeground);
+            opacity: .7;
+            margin-bottom: 6px;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--tp-teal);
+            line-height: 1;
+            margin-bottom: 3px;
+        }
+
+        .stat-sub {
+            font-size: 10px;
+            color: var(--vscode-descriptionForeground);
+        }
+
+        /* ── Heatmap ────────────────────────────── */
+        .heatmap-wrap {
+            overflow-x: auto;
+        }
+
+        .heatmap {
+            display: grid;
+            grid-template-columns: 32px repeat(24, 1fr);
+            gap: 2px;
+            min-width: 400px;
+        }
+
+        .heatmap-label {
+            font-size: 9px;
+            color: var(--vscode-descriptionForeground);
+            display: flex;
+            align-items: center;
+            opacity: .6;
+        }
+
+        .heatmap-hour-labels {
+            display: grid;
+            grid-template-columns: 32px repeat(24, 1fr);
+            gap: 2px;
+            margin-bottom: 4px;
+            min-width: 400px;
+        }
+
+        .heatmap-hour-label {
+            font-size: 8px;
+            color: var(--vscode-descriptionForeground);
+            text-align: center;
+            opacity: .5;
+        }
+
+        .heatmap-cell {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 2px;
+            background: var(--vscode-input-background);
+            transition: background .2s;
+            cursor: default;
+            position: relative;
+        }
+
+        .heatmap-cell:hover::after {
+            content: attr(data-tip);
+            position: absolute;
+            bottom: 110%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--vscode-editorWidget-background);
+            border: 1px solid var(--vscode-panel-border);
+            color: var(--vscode-foreground);
+            font-size: 10px;
+            padding: 3px 7px;
+            border-radius: 4px;
+            white-space: nowrap;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        /* ── Model breakdown ────────────────────── */
+        .model-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .model-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .model-name {
+            font-size: 11px;
+            font-weight: 600;
+            width: 130px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex-shrink: 0;
+        }
+
+        .model-bar-wrap {
+            flex: 1;
+            height: 4px;
+            background: var(--vscode-input-background);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .model-bar-fill {
+            height: 100%;
+            border-radius: 2px;
+            background: var(--tp-teal);
+            transition: width .5s ease;
+        }
+
+        .model-cost {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--tp-teal);
+            width: 50px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .model-tokens {
+            font-size: 10px;
+            color: var(--vscode-descriptionForeground);
+            width: 55px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        /* ── Platform breakdown ─────────────────── */
+        .platform-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .platform-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .platform-name {
+            font-size: 11px;
+            font-weight: 600;
+            width: 90px;
+            flex-shrink: 0;
+        }
+
+        .platform-bar-wrap {
+            flex: 1;
+            height: 4px;
+            background: var(--vscode-input-background);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .platform-bar-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width .5s ease;
+        }
+
+        .platform-cost {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--tp-teal);
+            width: 50px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        /* Platform colors */
+        .bar-anthropic {
+            background: #e8894a;
+        }
+
+        .bar-openai {
+            background: #19c37d;
+        }
+
+        .bar-google {
+            background: #4285f4;
+        }
+
+        .bar-deepseek {
+            background: #4d90fe;
+        }
+
+        /* ── Empty state ─────────────────────────── */
+        .empty {
+            text-align: center;
+            padding: 32px 16px;
+            color: var(--vscode-descriptionForeground);
+            font-size: 12px;
+        }
+
+        .empty-icon {
+            font-size: 28px;
+            margin-bottom: 10px;
+            opacity: .4;
+        }
+
+        /* ── Sign in banner ─────────────────────── */
+        .signin-banner {
+            margin: 12px 16px;
+            background: var(--tp-teal-glow);
+            border: 1px solid rgba(6, 182, 212, 0.2);
+            border-radius: 8px;
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .signin-text {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            line-height: 1.5;
+        }
+
+        .signin-btn {
+            padding: 6px 14px;
+            border-radius: 6px;
+            background: var(--tp-teal);
+            color: #080808;
+            border: none;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 700;
+            font-family: inherit;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        /* ── Reset btn ──────────────────────────── */
+        .footer {
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .footer-note {
+            font-size: 9px;
+            color: var(--vscode-descriptionForeground);
+            opacity: .5;
+        }
+
+        .reset-btn {
+            font-size: 10px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            background: none;
+            color: var(--vscode-descriptionForeground);
+            border: 1px solid var(--vscode-panel-border);
+            cursor: pointer;
+            font-family: inherit;
+            transition: color .15s, border-color .15s;
+        }
+
+        .reset-btn:hover {
+            color: var(--tp-teal);
+            border-color: rgba(6, 182, 212, .3);
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <div class="logo-ring">
+                <svg viewBox="0 0 28 28" fill="none">
+                    <circle cx="14" cy="14" r="11" stroke="#1a1a1a" stroke-width="3" />
+                    <path d="M14 3 a11 11 0 0 1 9.53 5.5" stroke="#06b6d4" stroke-width="3" stroke-linecap="round" />
+                    <circle cx="14" cy="14" r="6.5" stroke="#1a1a1a" stroke-width="2.5" />
+                    <path d="M14 7.5 a6.5 6.5 0 0 1 5.63 3.25 a6.5 6.5 0 0 1 0 6.5" stroke="#67e8f9" stroke-width="2.5"
+                        stroke-linecap="round" />
+                    <text x="14" y="18" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="8"
+                        font-weight="800" fill="white">T</text>
+                </svg>
+            </div>
+            <span class="header-title">TokenPulse</span>
+        </div>
+        <div class="header-right">
+            <div class="status-pill" id="status-pill">
+                <div class="status-dot"></div>
+                <span id="status-text">Active</span>
+            </div>
+            <button class="icon-btn" onclick="refresh()" title="Refresh">↺</button>
+            <button class="icon-btn" onclick="resetSession()" title="Reset session">⊘</button>
+        </div>
+    </div>
+
+    <!-- Sign in banner (shown when not signed in) -->
+    <div class="signin-banner" id="signin-banner" style="display:none">
+        <div class="signin-text">
+            Sign in to sync usage across devices and unlock history.
+        </div>
+        <button class="signin-btn" onclick="signIn()">Sign in with Google</button>
+    </div>
+
+    <!-- Budget -->
+    <div class="section">
+        <div class="section-label">Monthly Budget</div>
+        <div class="budget-header">
+            <div>
+                <div class="budget-amount" id="budget-spent">$0.00</div>
+                <div class="budget-limit" id="budget-limit-text">of $20.00 this month</div>
+            </div>
+            <button class="budget-edit-btn" onclick="toggleBudgetEdit()">Edit budget</button>
+        </div>
+        <div class="budget-bar-track">
+            <div class="budget-bar-fill" id="budget-bar" style="width:0%"></div>
+        </div>
+        <div class="budget-meta">
+            <span id="budget-pct">0% used</span>
+            <span id="budget-days"></span>
+        </div>
+        <div class="budget-pace" id="budget-pace"></div>
+
+        <div class="budget-form" id="budget-form">
+            <span style="font-size:12px">$</span>
+            <input class="budget-input" type="number" id="budget-input" placeholder="20" min="1" max="10000">
+            <button class="budget-save" onclick="saveBudget()">Save</button>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="section">
+        <div class="section-label">Usage Overview</div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Session</div>
+                <div class="stat-value" id="stat-session-cost">$0.00</div>
+                <div class="stat-sub" id="stat-session-tokens">0 tokens</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Today</div>
+                <div class="stat-value" id="stat-today-cost">$0.00</div>
+                <div class="stat-sub" id="stat-today-tokens">0 tokens</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">This Week</div>
+                <div class="stat-value" id="stat-week-cost">$0.00</div>
+                <div class="stat-sub" id="stat-week-tokens">0 tokens</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activity Heatmap -->
+    <div class="section">
+        <div class="section-label">Activity — Last 7 Days</div>
+        <div class="heatmap-wrap">
+            <div class="heatmap-hour-labels" id="heatmap-hour-labels"></div>
+            <div class="heatmap" id="heatmap"></div>
+        </div>
+    </div>
+
+    <!-- By Model -->
+    <div class="section">
+        <div class="section-label">By Model — This Session</div>
+        <div class="model-list" id="model-list">
+            <div class="empty">
+                <div class="empty-icon">◎</div>
+                No requests yet this session
+            </div>
+        </div>
+    </div>
+
+    <!-- By Platform -->
+    <div class="section">
+        <div class="section-label">By Platform — This Week</div>
+        <div class="platform-list" id="platform-list">
+            <div class="empty" style="padding:12px 0;font-size:11px">No data yet</div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <span class="footer-note">±8% accuracy · input tokens only</span>
+        <button class="reset-btn" onclick="resetSession()">Reset session</button>
+    </div>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+        let state = {};
+        let budget = 20;
+
+        // ── Helpers ───────────────────────────────
+        function fmtCost(usd) {
+            if (!usd || usd <= 0) return "$0.00";
+            if (usd < 0.001) return "<$0.001";
+            if (usd < 0.01) return "$" + usd.toFixed(4);
+            if (usd < 1) return "$" + usd.toFixed(3);
+            return "$" + usd.toFixed(2);
+        }
+
+        function fk(n) {
+            if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
+            if (n >= 1000) return (n / 1000).toFixed(1) + "k";
+            return String(Math.round(n));
+        }
+
+        function clamp(v, min, max) { return Math.min(Math.max(v, min), max); }
+
+        // ── Budget ────────────────────────────────
+        function toggleBudgetEdit() {
+            const form = document.getElementById("budget-form");
+            form.classList.toggle("visible");
+            if (form.classList.contains("visible")) {
+                document.getElementById("budget-input").value = budget;
+                document.getElementById("budget-input").focus();
+            }
+        }
+
+        function saveBudget() {
+            const val = parseFloat(document.getElementById("budget-input").value);
+            if (val > 0) {
+                budget = val;
+                vscode.postMessage({ type: "SET_BUDGET", budget: val });
+                document.getElementById("budget-form").classList.remove("visible");
+                renderBudget();
+            }
+        }
+
+        function renderBudget() {
+            const spent = state.month?.cost || 0;
+            const pct = budget > 0 ? clamp((spent / budget) * 100, 0, 100) : 0;
+            const daysLeft = daysLeftInMonth();
+
+            document.getElementById("budget-spent").textContent = fmtCost(spent);
+            document.getElementById("budget-limit-text").textContent = `of ${fmtCost(budget)} this month`;
+            document.getElementById("budget-pct").textContent = Math.round(pct) + "% used";
+            document.getElementById("budget-days").textContent = daysLeft + " days remaining";
+
+            const bar = document.getElementById("budget-bar");
+            bar.style.width = pct + "%";
+            bar.className = "budget-bar-fill" + (pct >= 90 ? " danger" : pct >= 75 ? " warn" : "");
+
+            // Pace
+            const dayOfMonth = new Date().getDate();
+            const totalDays = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+            const expectedPct = (dayOfMonth / totalDays) * 100;
+            const paceEl = document.getElementById("budget-pace");
+
+            if (spent > 0) {
+                const projectedMonthly = (spent / dayOfMonth) * totalDays;
+                if (projectedMonthly > budget) {
+                    paceEl.className = "budget-pace over";
+                    paceEl.textContent = `⚠ On track to exceed budget by ${fmtCost(projectedMonthly - budget)}`;
+                } else {
+                    paceEl.className = "budget-pace under";
+                    paceEl.textContent = `✓ On track — projected ${fmtCost(projectedMonthly)} this month`;
+                }
+            } else {
+                paceEl.textContent = "";
+            }
+        }
+
+        function daysLeftInMonth() {
+            const now = new Date();
+            const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+            return lastDay - now.getDate();
+        }
+
+        // ── Stats ─────────────────────────────────
+        function renderStats() {
+            const s = state.session || { cost: 0, tokens: 0 };
+            const t = state.today || { cost: 0, tokens: 0 };
+            const w = state.week || { cost: 0, tokens: 0 };
+
+            document.getElementById("stat-session-cost").textContent = fmtCost(s.cost);
+            document.getElementById("stat-session-tokens").textContent = fk(s.tokens) + " tokens";
+            document.getElementById("stat-today-cost").textContent = fmtCost(t.cost);
+            document.getElementById("stat-today-tokens").textContent = fk(t.tokens) + " tokens";
+            document.getElementById("stat-week-cost").textContent = fmtCost(w.cost);
+            document.getElementById("stat-week-tokens").textContent = fk(w.tokens) + " tokens";
+        }
+
+        // ── Heatmap ───────────────────────────────
+        function renderHeatmap() {
+            const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+            const heatData = state.heatmap || {};
+            const maxVal = Math.max(1, ...Object.values(heatData).map(Number));
+
+            // Hour labels
+            const hourLabels = document.getElementById("heatmap-hour-labels");
+            hourLabels.innerHTML = '<div></div>' + // spacer
+                Array.from({ length: 24 }, (_, h) =>
+                    `<div class="heatmap-hour-label">${h % 6 === 0 ? h + "h" : ""}</div>`
+                ).join("");
+
+            // Grid
+            const grid = document.getElementById("heatmap");
+            grid.innerHTML = "";
+
+            const today = new Date();
+            for (let d = 6; d >= 0; d--) {
+                const date = new Date(today);
+                date.setDate(today.getDate() - d);
+                const dayName = days[date.getDay()];
+                const dateStr = date.toISOString().split("T")[0];
+
+                grid.innerHTML += `<div class="heatmap-label">${dayName}</div>`;
+
+                for (let h = 0; h < 24; h++) {
+                    const key = `${dateStr}-${h}`;
+                    const val = heatData[key] || 0;
+                    const alpha = val > 0 ? clamp(0.15 + (val / maxVal) * 0.85, 0.15, 1) : 0;
+                    const bg = val > 0
+                        ? `rgba(6,182,212,${alpha.toFixed(2)})`
+                        : "var(--vscode-input-background)";
+                    const tip = val > 0
+                        ? `${dateStr} ${h}:00 — ${fmtCost(val)}`
+                        : `${dateStr} ${h}:00 — no activity`;
+
+                    grid.innerHTML += `<div class="heatmap-cell" style="background:${bg}" data-tip="${tip}"></div>`;
+                }
+            }
+        }
+
+        // ── Model breakdown ───────────────────────
+        function renderModels() {
+            const models = state.models || [];
+            const el = document.getElementById("model-list");
+            if (models.length === 0) {
+                el.innerHTML = `<div class="empty"><div class="empty-icon">◎</div>No requests yet this session</div>`;
+                return;
+            }
+            const maxCost = Math.max(1, ...models.map(m => m.cost));
+            el.innerHTML = models.map(m => `
+      <div class="model-row">
+        <div class="model-name" title="${m.model}">${m.model.replace("copilot-", "")}</div>
+        <div class="model-bar-wrap">
+          <div class="model-bar-fill" style="width:${clamp((m.cost / maxCost) * 100, 0, 100)}%"></div>
+        </div>
+        <div class="model-tokens">${fk(m.tokens)}</div>
+        <div class="model-cost">${fmtCost(m.cost)}</div>
+      </div>`).join("");
+        }
+
+        // ── Platform breakdown ────────────────────
+        function renderPlatforms() {
+            const platforms = state.platforms || [];
+            const el = document.getElementById("platform-list");
+            if (platforms.length === 0) {
+                el.innerHTML = `<div class="empty" style="padding:12px 0;font-size:11px">No data yet</div>`;
+                return;
+            }
+            const maxCost = Math.max(1, ...platforms.map(p => p.cost));
+            const colors = { anthropic: "bar-anthropic", openai: "bar-openai", google: "bar-google", deepseek: "bar-deepseek" };
+            el.innerHTML = platforms.map(p => `
+      <div class="platform-row">
+        <div class="platform-name">${p.provider.charAt(0).toUpperCase() + p.provider.slice(1)}</div>
+        <div class="platform-bar-wrap">
+          <div class="platform-bar-fill ${colors[p.provider] || ""}" style="width:${clamp((p.cost / maxCost) * 100, 0, 100)}%"></div>
+        </div>
+        <div class="platform-cost">${fmtCost(p.cost)}</div>
+      </div>`).join("");
+        }
+
+        // ── Render all ────────────────────────────
+        function renderAll() {
+            renderBudget();
+            renderStats();
+            renderHeatmap();
+            renderModels();
+            renderPlatforms();
+        }
+
+        // ── Actions ───────────────────────────────
+        function refresh() { vscode.postMessage({ type: "REFRESH" }); }
+        function resetSession() { vscode.postMessage({ type: "RESET_SESSION" }); }
+        function signIn() { vscode.postMessage({ type: "SIGN_IN" }); }
+
+        // ── Message from extension ────────────────
+        window.addEventListener("message", e => {
+            const msg = e.data;
+            if (msg.type === "UPDATE") {
+                state = msg.data;
+                budget = msg.budget || 20;
+
+                // Sign in banner
+                document.getElementById("signin-banner").style.display =
+                    msg.signedIn ? "none" : "flex";
+
+                renderAll();
+            }
+        });
+
+        // Initial render with empty state
+        renderAll();
+    </script>
+</body>
+
+</html>
