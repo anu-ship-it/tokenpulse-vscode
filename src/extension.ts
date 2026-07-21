@@ -88,6 +88,7 @@ let sessionRequests: RequestRecord[] = [];
 let todayRequests:   RequestRecord[] = [];
 let statusBar:       vscode.StatusBarItem;
 let panel:           vscode.WebviewPanel | undefined;
+let extensionContext: vscode.ExtensionContext;
 
 // ── Helpers ───────────────────────────────────────────────────────
 function estimateCost(tokens: number, model: string): number {
@@ -140,6 +141,41 @@ function getWeekTotal(): { tokens: number; cost: number } {
   };
 }
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, character => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  }[character] ?? character));
+}
+
+function getWebviewHtml(_context: vscode.ExtensionContext): string {
+  const data = getDashboardData();
+  const rows = data.models.length === 0
+    ? "<tr><td colspan=\"3\">No requests recorded yet.</td></tr>"
+    : data.models.map(({ model, tokens, cost }) =>
+        `<tr><td>${escapeHtml(model)}</td><td>${tokens.toLocaleString()}</td><td>${fmtCost(cost)}</td></tr>`
+      ).join("");
+
+  return `<!doctype html>
+<html><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
+<style>
+body{font-family:var(--vscode-font-family);color:var(--vscode-foreground);padding:20px}
+.cards{display:flex;gap:12px;flex-wrap:wrap}.card{background:var(--vscode-textBlockQuote-background);padding:14px;min-width:140px}
+.label{opacity:.75;font-size:.85em}.value{font-size:1.4em;font-weight:600}table{border-collapse:collapse;margin-top:24px;width:100%}
+th,td{text-align:left;padding:8px;border-bottom:1px solid var(--vscode-panel-border)}
+</style></head><body><h1>TokenPulse</h1>
+<div class="cards">
+<div class="card"><div class="label">Session</div><div class="value">${data.session.tokens.toLocaleString()} tokens</div><div>${fmtCost(data.session.cost)}</div></div>
+<div class="card"><div class="label">Today</div><div class="value">${data.today.tokens.toLocaleString()} tokens</div><div>${fmtCost(data.today.cost)}</div></div>
+<div class="card"><div class="label">Last 7 days</div><div class="value">${data.week.tokens.toLocaleString()} tokens</div><div>${fmtCost(data.week.cost)}</div></div>
+<div class="card"><div class="label">Requests</div><div class="value">${data.requestCount}</div></div>
+</div><h2>Session by model</h2><table><thead><tr><th>Model</th><th>Tokens</th><th>Cost</th></tr></thead><tbody>${rows}</tbody></table>
+</body></html>`;
+}
+
 // ── Status bar update ─────────────────────────────────────────────
 function updateStatusBar(): void {
   const config = vscode.workspace.getConfiguration("tokenpulse");
@@ -159,7 +195,7 @@ function updateStatusBar(): void {
   statusBar.show();
 
   if (panel) {
-    panel.webview.html = getWebviewHtml(context);
+    panel.webview.html = getWebviewHtml(extensionContext);
   }
 }
 
@@ -182,131 +218,6 @@ function getDashboardData() {
   return { session, today, week, models, requestCount: sessionRequests.length };
 }
 
-// ── Webview content ───────────────────────────────────────────────
-function getWebviewContent(data: ReturnType<typeof getDashboardData>): string {
-  const { session, today, week, models, requestCount } = data;
-
-  const modelRows = models.length === 0
-    ? `<div class="empty-row">No requests yet this session</div>`
-    : models.map(m => `
-        <div class="model-row">
-          <div class="model-name">${m.model.replace("copilot-", "")}</div>
-          <div class="model-stats">
-            <span class="model-tokens">${fk(m.tokens)} tokens</span>
-            <span class="model-cost">${fmtCost(m.cost)}</span>
-          </div>
-        </div>`).join("");
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TokenPulse</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: var(--vscode-font-family);
-      font-size: var(--vscode-font-size);
-      color: var(--vscode-foreground);
-      background: var(--vscode-editor-background);
-      padding: 20px; line-height: 1.5;
-    }
-    .header {
-      display: flex; align-items: center; gap: 10px;
-      margin-bottom: 24px; padding-bottom: 16px;
-      border-bottom: 1px solid var(--vscode-panel-border);
-    }
-    .header-title { font-size: 16px; font-weight: 700; }
-    .header-sub   { font-size: 11px; color: var(--vscode-descriptionForeground); }
-    .grid {
-      display: grid; grid-template-columns: 1fr 1fr 1fr;
-      gap: 12px; margin-bottom: 24px;
-    }
-    .card {
-      background: var(--vscode-input-background);
-      border: 1px solid var(--vscode-panel-border);
-      border-radius: 8px; padding: 14px;
-    }
-    .card-label {
-      font-size: 10px; font-weight: 700; letter-spacing: .08em;
-      text-transform: uppercase; color: var(--vscode-descriptionForeground);
-      margin-bottom: 8px;
-    }
-    .card-value {
-      font-size: 22px; font-weight: 800;
-      color: var(--vscode-textLink-foreground); line-height: 1;
-    }
-    .card-sub { font-size: 11px; color: var(--vscode-descriptionForeground); margin-top: 4px; }
-    .section-title {
-      font-size: 11px; font-weight: 700; letter-spacing: .08em;
-      text-transform: uppercase; color: var(--vscode-descriptionForeground);
-      margin-bottom: 10px;
-    }
-    .model-row {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 14px;
-      background: var(--vscode-input-background);
-      border: 1px solid var(--vscode-panel-border);
-      border-radius: 6px; margin-bottom: 6px;
-    }
-    .model-name   { font-size: 13px; font-weight: 600; }
-    .model-stats  { display: flex; gap: 16px; align-items: center; }
-    .model-tokens { font-size: 12px; color: var(--vscode-descriptionForeground); }
-    .model-cost   { font-size: 13px; font-weight: 700; color: var(--vscode-textLink-foreground); }
-    .empty-row    { padding: 16px; text-align: center; color: var(--vscode-descriptionForeground); font-size: 12px; }
-    .reset-btn {
-      margin-top: 20px; padding: 8px 16px;
-      background: var(--vscode-button-background);
-      color: var(--vscode-button-foreground);
-      border: none; border-radius: 4px; cursor: pointer;
-      font-size: 12px; font-family: inherit;
-    }
-    .reset-btn:hover { background: var(--vscode-button-hoverBackground); }
-    .disclaimer { margin-top: 16px; font-size: 10px; color: var(--vscode-descriptionForeground); opacity: .6; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div>
-      <div class="header-title">TokenPulse</div>
-      <div class="header-sub">${requestCount} AI request${requestCount !== 1 ? "s" : ""} this session</div>
-    </div>
-  </div>
-
-  <div class="grid">
-    <div class="card">
-      <div class="card-label">This Session</div>
-      <div class="card-value">${fmtCost(session.cost)}</div>
-      <div class="card-sub">${fk(session.tokens)} tokens</div>
-    </div>
-    <div class="card">
-      <div class="card-label">Today</div>
-      <div class="card-value">${fmtCost(today.cost)}</div>
-      <div class="card-sub">${fk(today.tokens)} tokens</div>
-    </div>
-    <div class="card">
-      <div class="card-label">This Week</div>
-      <div class="card-value">${fmtCost(week.cost)}</div>
-      <div class="card-sub">${fk(week.tokens)} tokens</div>
-    </div>
-  </div>
-
-  <div class="section-title">By Model — This Session</div>
-  ${modelRows}
-
-  <button class="reset-btn" onclick="resetSession()">Reset Session</button>
-  <div class="disclaimer">±8% accuracy · input tokens only · output not included</div>
-
-  <script>
-    const vscode = acquireVsCodeApi();
-    function resetSession() {
-      vscode.postMessage({ type: "RESET_SESSION" });
-    }
-  </script>
-</body>
-</html>`;
-}
 
 // ── Record an AI request ──────────────────────────────────────────
 function recordRequest(
@@ -376,6 +287,7 @@ function registerLmListener(context: vscode.ExtensionContext): void {
 
 // ── Activate ──────────────────────────────────────────────────────
 export function activate(context: vscode.ExtensionContext): void {
+  extensionContext = context;
   // Load persisted today data
   const stored = context.globalState.get<RequestRecord[]>("todayRequests", []);
   todayRequests = stored.filter(r => isSameDay(r.ts));
