@@ -159,7 +159,7 @@ function updateStatusBar(): void {
   statusBar.show();
 
   if (panel) {
-    panel.webview.html = getWebviewContent(getDashboardData());
+    panel.webview.html = getWebviewHtml(context);
   }
 }
 
@@ -396,7 +396,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("tokenpulse.showDashboard", () => {
       if (panel) {
         panel.reveal();
-        panel.webview.html = getWebviewContent(getDashboardData());
+        panel.webview.html = getWebviewHtml(context);
         return;
       }
 
@@ -406,7 +406,7 @@ export function activate(context: vscode.ExtensionContext): void {
         { enableScripts: true }
       );
 
-      panel.webview.html = getWebviewContent(getDashboardData());
+      panel.webview.html = getWebviewHtml(context);
 
       panel.webview.onDidReceiveMessage(msg => {
         if (msg.type === "RESET_SESSION") {
@@ -425,7 +425,7 @@ export function activate(context: vscode.ExtensionContext): void {
       sessionRequests = [];
       updateStatusBar();
       if (panel) {
-        panel.webview.html = getWebviewContent(getDashboardData());
+        panel.webview.html = getWebviewHtml(context);
       }
       vscode.window.showInformationMessage("TokenPulse: Session reset.");
     })
