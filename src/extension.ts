@@ -2,7 +2,9 @@ const BACKEND_URL = "https://tokenpulsevscode-backend.onrender.com";
 const AUTH_KEY    = "tokenpulse.authToken";
 const USER_KEY    = "tokenpulse.userEmail";
 
+import { Context } from "mocha";
 import * as vscode from "vscode";
+import * as fs from "fs";
 
 // ── SignIn function ────────────────────────────
 async function signIn(context: vscode.ExtensionContext): Promise<string | null> {
@@ -151,30 +153,17 @@ function escapeHtml(value: string): string {
   }[character] ?? character));
 }
 
-function getWebviewHtml(_context: vscode.ExtensionContext): string {
-  const data = getDashboardData();
-  const rows = data.models.length === 0
-    ? "<tr><td colspan=\"3\">No requests recorded yet.</td></tr>"
-    : data.models.map(({ model, tokens, cost }) =>
-        `<tr><td>${escapeHtml(model)}</td><td>${tokens.toLocaleString()}</td><td>${fmtCost(cost)}</td></tr>`
-      ).join("");
-
-  return `<!doctype html>
-<html><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
-<style>
-body{font-family:var(--vscode-font-family);color:var(--vscode-foreground);padding:20px}
-.cards{display:flex;gap:12px;flex-wrap:wrap}.card{background:var(--vscode-textBlockQuote-background);padding:14px;min-width:140px}
-.label{opacity:.75;font-size:.85em}.value{font-size:1.4em;font-weight:600}table{border-collapse:collapse;margin-top:24px;width:100%}
-th,td{text-align:left;padding:8px;border-bottom:1px solid var(--vscode-panel-border)}
-</style></head><body><h1>TokenPulse</h1>
-<div class="cards">
-<div class="card"><div class="label">Session</div><div class="value">${data.session.tokens.toLocaleString()} tokens</div><div>${fmtCost(data.session.cost)}</div></div>
-<div class="card"><div class="label">Today</div><div class="value">${data.today.tokens.toLocaleString()} tokens</div><div>${fmtCost(data.today.cost)}</div></div>
-<div class="card"><div class="label">Last 7 days</div><div class="value">${data.week.tokens.toLocaleString()} tokens</div><div>${fmtCost(data.week.cost)}</div></div>
-<div class="card"><div class="label">Requests</div><div class="value">${data.requestCount}</div></div>
-</div><h2>Session by model</h2><table><thead><tr><th>Model</th><th>Tokens</th><th>Cost</th></tr></thead><tbody>${rows}</tbody></table>
-</body></html>`;
-}
+function getWebviewHtml(context: vscode.ExtensionContext, webview: vscode.Webview): string {
+  const htmlPath = vscode.Uri.joinPath(context.extensionUri, "media", "dashboard.html");
+  try {
+    let html = fs.readFileSync(htmlPath.fsPath, "utf8");
+    return html;
+  } catch (e) {
+    return `<html><body style="color:white;padding:20px">
+      Dashboard not found at: ${htmlPath.fsPath}
+    </body></html>`;
+  }
+} 
 
 // ── Status bar update ─────────────────────────────────────────────
 function updateStatusBar(): void {
@@ -195,7 +184,7 @@ function updateStatusBar(): void {
   statusBar.show();
 
   if (panel) {
-    panel.webview.html = getWebviewHtml(extensionContext);
+    panel.webview.html = getWebviewHtml(context, panel.webview);
   }
 }
 
@@ -308,17 +297,23 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("tokenpulse.showDashboard", () => {
       if (panel) {
         panel.reveal();
-        panel.webview.html = getWebviewHtml(context);
+        panel.webview.html = getWebviewHtml(context, panel.webview);
         return;
       }
+
+      const mediaUri = vscode.Uri.joinPath(context.extensionUri, "media");
 
       panel = vscode.window.createWebviewPanel(
         "tokenpulse", "TokenPulse",
         vscode.ViewColumn.Beside,
-        { enableScripts: true }
+        { 
+          enableScripts: true, 
+          retainContextWhenHidden: true,
+          localResourceRoots: [mediaUri],
+        }
       );
 
-      panel.webview.html = getWebviewHtml(context);
+      panel.webview.html = getWebviewHtml(context, panel.webview);
 
       panel.webview.onDidReceiveMessage(msg => {
         if (msg.type === "RESET_SESSION") {
@@ -337,7 +332,7 @@ export function activate(context: vscode.ExtensionContext): void {
       sessionRequests = [];
       updateStatusBar();
       if (panel) {
-        panel.webview.html = getWebviewHtml(context);
+        panel.webview.html = getWebviewHtml(context, panel.webview);
       }
       vscode.window.showInformationMessage("TokenPulse: Session reset.");
     })
