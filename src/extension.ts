@@ -99,15 +99,25 @@ function estimateCost(tokens: number, model: string): number {
 }
 
 function fmtCost(usd: number): string {
-  if (usd <= 0)    return "$0.00";
-  if (usd < 0.001) return "<$0.001";
-  if (usd < 0.01)  return "$" + usd.toFixed(4);
-  if (usd < 1)     return "$" + usd.toFixed(3);
+  if (usd <= 0) {
+    return "$0.00";
+  }
+  if (usd < 0.001) {
+    return "<$0.001";
+  }
+  if (usd < 0.01) {
+    return "$" + usd.toFixed(4);
+  }
+  if (usd < 1) {
+    return "$" + usd.toFixed(3);
+  }
   return "$" + usd.toFixed(2);
 }
 
 function fk(n: number): string {
-  if (n >= 1000) return (n / 1000).toFixed(1) + "k";
+  if (n >= 1000) {
+    return (n / 1000).toFixed(1) + "k";
+  }
   return String(Math.round(n));
 }
 
@@ -153,17 +163,14 @@ function escapeHtml(value: string): string {
   }[character] ?? character));
 }
 
-function getWebviewHtml(context: vscode.ExtensionContext, webview: vscode.Webview): string {
+function getWebviewHtml(context: vscode.ExtensionContext): string {
   const htmlPath = vscode.Uri.joinPath(context.extensionUri, "media", "dashboard.html");
   try {
-    let html = fs.readFileSync(htmlPath.fsPath, "utf8");
-    return html;
+    return fs.readFileSync(htmlPath.fsPath, "utf8");
   } catch (e) {
-    return `<html><body style="color:white;padding:20px">
-      Dashboard not found at: ${htmlPath.fsPath}
-    </body></html>`;
+    return `<html><body style="color:white;padding:20px">Dashboard not found at: ${htmlPath.fsPath}</body></html>`;
   }
-} 
+}
 
 // ── Status bar update ─────────────────────────────────────────────
 function updateStatusBar(): void {
@@ -184,7 +191,7 @@ function updateStatusBar(): void {
   statusBar.show();
 
   if (panel) {
-    panel.webview.html = getWebviewHtml(context, panel.webview);
+    panel.webview.html = getWebviewHtml(extensionContext);
   }
 }
 
@@ -297,7 +304,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("tokenpulse.showDashboard", () => {
       if (panel) {
         panel.reveal();
-        panel.webview.html = getWebviewHtml(context, panel.webview);
+        panel.webview.html = getWebviewHtml(context);
         return;
       }
 
@@ -313,7 +320,7 @@ export function activate(context: vscode.ExtensionContext): void {
         }
       );
 
-      panel.webview.html = getWebviewHtml(context, panel.webview);
+      panel.webview.html = getWebviewHtml(context);
 
       panel.webview.onDidReceiveMessage(msg => {
         if (msg.type === "RESET_SESSION") {
@@ -332,7 +339,7 @@ export function activate(context: vscode.ExtensionContext): void {
       sessionRequests = [];
       updateStatusBar();
       if (panel) {
-        panel.webview.html = getWebviewHtml(context, panel.webview);
+        panel.webview.html = getWebviewHtml(context);
       }
       vscode.window.showInformationMessage("TokenPulse: Session reset.");
     })
