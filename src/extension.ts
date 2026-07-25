@@ -172,26 +172,39 @@ function getWebviewHtml(context: vscode.ExtensionContext): string {
   }
 }
 
-// ── Status bar update ─────────────────────────────────────────────
-function updateStatusBar(): void {
-  const config = vscode.workspace.getConfiguration("tokenpulse");
-  if (!config.get<boolean>("showStatusBar", true)) {
-    statusBar.hide();
-    return;
+function getActiveFileTokens(): { tokens: number; selected: number } {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) {
+    return { tokens: 0, selected: 0 };
   }
 
-  const s = sessionTotal();
+  const fullText     = editor.document.getText();
+  const selectedText = editor.document.getText(editor.selection);
+
+  return {
+    tokens:   Math.ceil(fullText.length / 4),
+    selected: Math.ceil(selectedText.length / 4),
+  };
+}
+
+// ── Status bar update ─────────────────────────────────────────────
+async function updateStatusBar(): Promise<void> {
+  const s    = sessionTotal();
+  const file = getActiveFileTokens();
+
   if (s.tokens === 0) {
-    statusBar.text    = "$(pulse) TokenPulse";
-    statusBar.tooltip = "No AI requests this session";
+    // No API session — show file context for Copilot users
+    statusBar.text    = `$(pulse) ${fk(file.tokens)} tokens in file`;
+    statusBar.tooltip = `Current file: ~${file.tokens.toLocaleString()} tokens\nSelection: ~${file.selected.toLocaleString()} tokens\nClick to open dashboard`;
   } else {
-    statusBar.text    = `$(pulse) ${fk(s.tokens)} tokens · ${fmtCost(s.cost)}`;
+    statusBar.text    = `$(pulse) ${fk(s.tokens)} · ${fmtCost(s.cost)}`;
     statusBar.tooltip = `Session: ${s.tokens.toLocaleString()} tokens · ${fmtCost(s.cost)}\nClick to open dashboard`;
   }
   statusBar.show();
 
   if (panel) {
-    panel.webview.html = getWebviewHtml(extensionContext);
+    const data = getDashboardData();
+    panel.webview.postMessage({ type: "UPDATE", ...data, file });
   }
 }
 
@@ -294,6 +307,17 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   statusBar.command = "tokenpulse.showDashboard";
   context.subscriptions.push(statusBar);
+
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor(() => updateStatusBar())
+  );
+  context.subscriptions.push(
+    vscode.window.onDidChangeTextEditorSelection(() => updateStatusBar())
+  );
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeTextDocument(() => updateStatusBar())
+  );
+
   updateStatusBar();
 
   // LM listener

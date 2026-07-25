@@ -627,6 +627,28 @@
         </div>
     </div>
 
+    <!-- Copilot Section -->
+    <div class="section" id="copilot-section">
+        <div class="section-label">Current File — Copilot Context</div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">File Tokens</div>
+                <div class="stat-value" id="file-tokens">0</div>
+                <div class="stat-sub">~chars ÷ 4</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Selection</div>
+                <div class="stat-value" id="sel-tokens">0</div>
+                <div class="stat-sub">selected tokens</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Est. Cost</div>
+                <div class="stat-value" id="file-cost">$0.00</div>
+                <div class="stat-sub">GPT-4o pricing</div>
+            </div>
+        </div>
+    </div>
+
     <!-- Stats -->
     <div class="section">
         <div class="section-label">Usage Overview</div>
@@ -881,13 +903,17 @@
             if (msg.type === "UPDATE") {
                 state = msg.data;
                 budget = msg.budget || 20;
+                document.getElementById("file-tokens").textContent = fk(msg.file.tokens);
+                document.getElementById("sel-tokens").textContent = fk(msg.file.selected);
+                document.getElementById("file-cost").textContent = fmtCost((msg.file.tokens / 1_000_000) * 2.50);
+            
 
-                // Sign in banner
-                document.getElementById("signin-banner").style.display =
-                    msg.signedIn ? "none" : "flex";
+            // Sign in banner
+            document.getElementById("signin-banner").style.display =
+                msg.signedIn ? "none" : "flex";
 
-                renderAll();
-            }
+            renderAll();
+        }
         });
 
         // Initial render with empty state
