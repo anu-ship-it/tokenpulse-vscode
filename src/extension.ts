@@ -229,5 +229,76 @@ function registerLmListener(context: vscode.ExtensionContext): void {
   }
 
   // ── Strategy 2: Watch All document changes ───────────────────────
+  // This catches Copilot inline completions and chat responses
+  // by watching for large text insertions in any document
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeTextDocument(e => {
+      const changes = e.contentChanges;
+      if (changes.length === 0) { return; }
+
+      // Sum all text inserted in this event
+      const insertedText = changes
+        .filter(c => c.text.length > 0)
+        .map(c => c.text)
+        .join("");
+
+        // Only track meaningful insertions (not single keystrokes)
+        // Copilot completions and chat responses are typically 50+ chars
+        if (insertedText.length >= 50) {
+          const scheme = e.document.url.scheme;
+          // Capture from any scheme - cailot uses various internal schemes
+          // but we filter by insertion size to avoid noise
+          recordRequest(context, "copilot-default", insertedText);
+        }
+    })
+  );
+
+  // ── Strategy 3: Watch terminal for API call patterns ───────────────────
+  // When Continue/Cline make API calls, they often log to terminal
+  // This is a best-effort passive listener
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor(editor => {
+      if (editor) { updateStatusBar(context); }
+    })
+  );
+}
+
+// ── Auth ────────────────────────────
+async function signin(context: vscode.ExtensionContext): Promise<void> {
+  const authUrl = `${BACKEND_URL}/auth/google?redirect=vscode://tokenpulse/callback`;
+  vscode.env.openExternal(vscode.Uri.parse(authUrl));
+
+  const handler = vscode.window.registerUriHandler({
+    handleUri(uri: vscode.Uri) {
+      const token = new URLSearchParams(uri.query).get("token");
+      if (token) {
+        context.secrets.store(AUTH_KEY, token);
+        vscode.window.showInformationMessage("TokenPulse: Signed in - usage syncs across devices.");
+        updateStatusBar(context);
+      }
+      handler.dispose();
+    }
+  });
+  setTimeout(() => handler.dispose(), 120000);
+}
+
+// ── Webview HTML ────────────────────────────
+function getWebviewHtml(context: vscode.ExtensionContext): string {
+  const htmlPath = vscode.Uri.joinPath(context.extensionUri, "media",
+    "dashboard.html");
+    try {
+      return fs.readFileSync(htmlPath.fsPath, "utf-8");
+    } catch {
+      return `<html><body style="color:white;padding:20px">Dashboard not found at: ${htmlPath.fsPath}</body></html>`;
+    }
+}
+
+// ── Activate ────────────────────────────
+export function activate(context: vscode.ExtensionContext): void {
+  // Load persisted data
+  const stored = context.globalState.get<RequestRecord[]>("requests", []);
+  allRequests  = stored.filter(r => isWithinDays(r.ts, 30));
+  monthlyBudget = context.globalState.get<number>("budget", 20);
+
   
 }
