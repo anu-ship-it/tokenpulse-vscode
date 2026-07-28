@@ -1,10 +1,10 @@
-const BACKEND_URL = "https://tokenpulsevscode-backend.onrender.com";
-const AUTH_KEY    = "tokenpulse.authToken";
-const USER_KEY    = "tokenpulse.userEmail";
-
-import { Context } from "mocha";
 import * as vscode from "vscode";
 import * as fs from "fs";
+
+const BACKEND_URL = "https://tokenpulsevscode-backend.onrender.com";
+const AUTH_KEY    = "tokenpulse.authToken";
+
+
 
 // ── SignIn function ────────────────────────────
 async function signIn(context: vscode.ExtensionContext): Promise<string | null> {
