@@ -300,5 +300,96 @@ export function activate(context: vscode.ExtensionContext): void {
   allRequests  = stored.filter(r => isWithinDays(r.ts, 30));
   monthlyBudget = context.globalState.get<number>("budget", 20);
 
-  
+  // Status bar
+  statusBar   =
+  vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+  statusBar.command = "tokenpulse.showDashboard";
+  context.subscriptions.push(statusBar);
+
+  // File token watchers
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor(() => updateStatusBar(context))
+  );
+
+  updateStatusBar(context);
+
+  // LM listener
+  registerLmListener(context);
+
+  // Show dashboard command
+  context.subscriptions.push(
+    vscode.commands.registerCommand("tokenpulse.showDashboard", async () => {
+      if (panel) { panel.reveal(); return; }
+
+      panel = vscode.window.createWebviewPanel(
+        "tokenpulse", "TokenPulse",
+        vscode.ViewColumn.Beside,
+        {
+          enableScripts: true,
+          retainContextWhenHidden: true,
+          localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, "media")],
+        }
+      );
+
+      panel.webview.html = getWebviewHtml(context);
+
+      // Send initial data
+      const data = await getDashboardData(context);
+      panel.webview.postMessage({ type: "UPDATE", ...data });
+
+      // Handle message from webview
+      panel.webview.onDidReceiveMessage(async (msg) => {
+        switch (msg.type) {
+          case "REFRESH":
+            panel!.webview.postMessage({ type: "UPDATE", ...await getDashboardData(context) });
+            break;
+            case "RESET_SESSION":
+              sessionRequests = [];
+              await updateStatusBar(context);
+              panel!.webview.postMessage({ type: "UPDATE", ...await getDashboardData(context) });
+              vscode.window,showInformationMessage("TokenPulse: Session reset.");
+              break;
+            case "SET_BUDGET":
+              monthlyBudget = msg.budget;
+              context.globalState.update("budget", monthlyBudget);
+              panel!.webview.postMessage({ type: "UPDATE", ...await getDashboardData(context) });
+              break;
+            case "SIGN_IN":
+              await signIn(context);
+              break;    
+        }
+      });
+
+      panel.onDidDispose(() => { panel = undefined; });
+      context.subscriptions.push(panel);
+    })
+  );
+
+  // Reset session
+  context.subscriptions.push(
+    vscode.commands.registerCommand("tokenpulse.resetSession", async () => {
+      sessionRequests = [];
+      await updateStatusBar(context);
+      vscode.window.showInformationMessage("TokenPulse: Session reset.");
+    })
+  );
+
+  // Sign in/out
+  context.subscriptions.push(
+    vscode.commands.registerCommand("tokenpulse.signIn", () => signIn(context))
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("tokenpulse.signOut", async () => {
+      await context.secrets.delete(AUTH_KEY);
+      vscode.window.showInformationMessage("TokenPulse: Signed out.");
+      updateStatusBar(context);
+    })
+  );
+
+  vscode.window.showInformationMessage("TokenPulse is active.");
+}
+
+export function deactivate(): void {
+  statusBar?.dispose();
+  panel?.dispose();
 }
