@@ -175,4 +175,59 @@ async function recordRequest(
   context: vscode.ExtensionContext,
   modelId: string,
   inputText: string
-): 
+): Promise<void> {
+  const tokenCount = Math.ceil(inputText.length / 4);
+  if (tokenCount < 10) { return; } // ignore noise
+
+  const cost = estimateCost(tokenCount, modelId);
+  const record: RequestRecord = { ts: Date.now(), model: modelId, tokens: tokenCount, cost };
+
+  sessionRequests.push(record);
+  allRequests.push(record);
+
+  // Persist last 30 days
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const stored = context.globalState.get<RequestRecord[]>("requests", []);
+  stored.push(record);
+  context.globalState.update("requests", stored.filter(r => r.ts > cutoff));
+
+  await updateStatusBar(context);
+
+  // Budget warning at 90%
+  const month = monthTotal();
+  if (monthlyBudget > 0) {
+    const pct = (month.cost / monthlyBudget) * 100;
+    if (pct >= 90 && (pct - (cost / monthlyBudget * 100)) < 90) {
+      vscode.window.showWarningMessage(
+        `TokenPulse: ${Math.round(pct)}% of monthly budget used
+        (${fmtCost(month.cost)} of ${fmtCost(monthlyBudget)})`
+      );
+    }
+  }
+}
+
+// ── LM listener ────────────────────────────
+function registerLmListener(context: vscode.ExtensionContext): void {
+
+  // ── Strategy 1: vscode.lm official API ─────────────────────────
+  // Wrap sendRequest if available
+  if (vscode.lm && typeof (vscode.lm as any).sendRequest === "function") {
+    const original = (vscode.lm as any).sendRequest.bind(vscode.lm);
+    (vscode.lm as any).sendRequest = async function(...args: any[]) {
+      const response = await original(...args);
+      const messages = args[1] || [];
+      const inputText = Array.isArray(messages)
+        ? messages.map((m: any) => typeof m.content === "string" ? m.content : "").join(" ")
+        : "";
+      const modelId = args[0]?.id || "default";
+      recordRequest(context, modelId, inputText);
+      return response;  
+    };
+    context.subscriptions.push({ dispose: () => {
+      (vscode.lm as any).sendRequest = original;
+    }});
+  }
+
+  // ── Strategy 2: Watch All document changes ───────────────────────
+  
+}
