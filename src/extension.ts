@@ -27,7 +27,7 @@ interface RequestRecord {
 // ── State ────────────────────────────
 let sessionRequests:  RequestRecord[] = [];
 let allRequests:      RequestRecord[] = [];
-let statusBar:        RequestRecord[] = [];
+let statusBar:        vscode.StatusBarItem;
 let panel:            vscode.WebviewPanel | undefined;
 let monthlyBudget    = 20;
 
@@ -38,16 +38,28 @@ function estimateCost(tokens: number, model: string): number {
 }
 
 function fmtCost(usd: number): string {
-  if (usd <= 0)     return "$0.00";
-  if (usd < 0.001)  return "<$0.001";
-  if (usd < 0.01)   return "$" + usd.toFixed(4);
-  if (usd < 1)      return "$" + usd.toFixed(3);
+  if (usd <= 0) {
+    return "$0.00";
+  }
+  if (usd < 0.001) {
+    return "<$0.001";
+  }
+  if (usd < 0.01) {
+    return "$" + usd.toFixed(4);
+  }
+  if (usd < 1) {
+    return "$" + usd.toFixed(3);
+  }
   return "$" + usd.toFixed(2);
 }
 
 function fk(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1000)      return (n / 1000).toFixed(1) + "k";
+  if (n >= 1_000_000) {
+    return (n / 1_000_000).toFixed(1) + "M";
+  }
+  if (n >= 1000) {
+    return (n / 1000).toFixed(1) + "k";
+  }
   return String(Math.round(n));
 }
 
@@ -107,7 +119,7 @@ function modelBreakdown() {
     map[r.model].cost   += r.cost;
   }
   return Object.entries(map)
-    .map(([modelBreakdown, d]) => ({ model, ...d }))
+    .map(([model, d]) => ({ model, ...d }))
     .sort((a, b) => b.cost - a.cost);
 }
 
@@ -143,7 +155,7 @@ async function getDashboardData(context: vscode.ExtensionContext) {
     models:     modelBreakdown(),
     heatmap:    heatmapData(),
     budget:     monthlyBudget,
-    signedIn:   !!token,
+    signedIn:   !!tokes,
     requestCount: sessionRequests.length,
     file:         getActiveFileTokens(),
   };
@@ -245,7 +257,7 @@ function registerLmListener(context: vscode.ExtensionContext): void {
         // Only track meaningful insertions (not single keystrokes)
         // Copilot completions and chat responses are typically 50+ chars
         if (insertedText.length >= 50) {
-          const scheme = e.document.url.scheme;
+          const scheme = e.document.uri.scheme;
           // Capture from any scheme - cailot uses various internal schemes
           // but we filter by insertion size to avoid noise
           recordRequest(context, "copilot-default", insertedText);
@@ -264,7 +276,7 @@ function registerLmListener(context: vscode.ExtensionContext): void {
 }
 
 // ── Auth ────────────────────────────
-async function signin(context: vscode.ExtensionContext): Promise<void> {
+async function signIn(context: vscode.ExtensionContext): Promise<void> {
   const authUrl = `${BACKEND_URL}/auth/google?redirect=vscode://tokenpulse/callback`;
   vscode.env.openExternal(vscode.Uri.parse(authUrl));
 
@@ -347,7 +359,7 @@ export function activate(context: vscode.ExtensionContext): void {
               sessionRequests = [];
               await updateStatusBar(context);
               panel!.webview.postMessage({ type: "UPDATE", ...await getDashboardData(context) });
-              vscode.window,showInformationMessage("TokenPulse: Session reset.");
+              vscode.window.showInformationMessage("TokenPulse: Session reset.");
               break;
             case "SET_BUDGET":
               monthlyBudget = msg.budget;
