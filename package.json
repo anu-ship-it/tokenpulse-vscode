@@ -13,6 +13,7 @@
   "activationEvents": ["onStartupFinished", "onUri"],
   "main": "./dist/extension.js",
   "contributes": {
+    "uriSchemes": ["vscode"],
     "commands": [
       {
         "command": "tokenpulse.showDashboard",
