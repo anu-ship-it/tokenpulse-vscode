@@ -600,6 +600,21 @@
         </div>
         <button class="signin-btn" onclick="signIn()">Sign in with Google</button>
     </div>
+    <div class="api-key-section" id="api-key-section">
+        <div class="section-label">Configure API Key</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+            <select id="api-provider" class="support-input">
+                <option value="anthropic">Anthropic (Claude)</option>
+                <option value="openai">OpenAI (ChatGPT)</option>
+                <option value="deepseek">DeepSeek</option>
+            </select>
+            <input type="password" id="api-key-input" class="support-input" placeholder="sk-ant-...">
+            <button class="budget-save" onclick="saveApiKey()">Save API Key</button>
+        </div>
+        <div style="font-size:10px;color:var(--vscode-descriptionForeground);margin-top:8px">
+            Keys are stored encrypted in VS Code's secret storage. Never sent anywhere except the AI provider.
+        </div>
+    </div>
 
     <!-- Budget -->
     <div class="section">
@@ -897,6 +912,16 @@
         function resetSession() { vscode.postMessage({ type: "RESET_SESSION" }); }
         function signIn() { vscode.postMessage({ type: "SIGN_IN" }); }
 
+        function saveApiKey() {
+            const provider = document.getElementById("api-provider").value;
+            const key = document.getElementById("api-key-input").value.trim();
+            if (!key) { return; }
+            vscode.postMessage({ type: "SAVE_API_KEY", provider, key });
+            document.getElementById("api-key-input").value = "";
+            // Show success
+            vscode.postMessage({ type: "REFRESH" });
+        }
+
         // ── Message from extension ────────────────
         window.addEventListener("message", e => {
             const msg = e.data;
@@ -906,14 +931,14 @@
                 document.getElementById("file-tokens").textContent = fk(msg.file.tokens);
                 document.getElementById("sel-tokens").textContent = fk(msg.file.selected);
                 document.getElementById("file-cost").textContent = fmtCost((msg.file.tokens / 1_000_000) * 2.50);
-            
 
-            // Sign in banner
-            document.getElementById("signin-banner").style.display =
-                msg.signedIn ? "none" : "flex";
 
-            renderAll();
-        }
+                // Sign in banner
+                document.getElementById("signin-banner").style.display =
+                    msg.signedIn ? "none" : "flex";
+
+                renderAll();
+            }
         });
 
         // Initial render with empty state
