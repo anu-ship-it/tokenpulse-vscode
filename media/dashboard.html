@@ -928,10 +928,11 @@
             if (msg.type === "UPDATE") {
                 state = msg.data;
                 budget = msg.budget || 20;
-                document.getElementById("file-tokens").textContent = fk(msg.file.tokens);
-                document.getElementById("sel-tokens").textContent = fk(msg.file.selected);
-                document.getElementById("file-cost").textContent = fmtCost((msg.file.tokens / 1_000_000) * 2.50);
-
+                if (msg.file) {
+                    document.getElementById("file-tokens").textContent = fk(msg.file.tokens);
+                    document.getElementById("sel-tokens").textContent = fk(msg.file.selected);
+                    document.getElementById("file-cost").textContent = fmtCost((msg.file.tokens / 1_000_000) * 2.50);
+                }
 
                 // Sign in banner
                 document.getElementById("signin-banner").style.display =
